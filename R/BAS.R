@@ -357,7 +357,7 @@ getBASSample <- function(shapefile, bb, n, seeds, J = c(0,0)){
   shift.bas <- bb.bounds[1:2]
 
   if( !any(J != 0) ){
-    res <- cppBASpts(n = n, seeds = seedshift, bases = base::c(2, 3))  
+    res <- spbal::cppBASpts(n = n, seeds = seedshift, bases = base::c(2, 3))  
     siteid <- 1:n
     pts <- res$pts
 
@@ -374,7 +374,8 @@ getBASSample <- function(shapefile, bb, n, seeds, J = c(0,0)){
     B <- 2^J[1]*3^J[2]
     res <- spbal::cppBASpts(n = B, seeds = seedshift, bases = base::c(2, 3))
     
-    ## Keep every Bth siteid point in the Halton Sequence for increased simplicity.
+    ## Keep every Bth siteid point in the Halton Sequence for increased simplicity. Would prefer if we could just loop
+    ## Inside the cppBASpts function for this and auto skip them as previous pacakge did (future addition).
     siteid <- which(res$pts[,1] > xlim[1] & res$pts[,1] < xlim[2] & res$pts[,2] > ylim[1] & res$pts[,2] < ylim[2])
     n.inner <- length(siteid )
     n.rep <- n %/% n.inner
@@ -382,7 +383,7 @@ getBASSample <- function(shapefile, bb, n, seeds, J = c(0,0)){
     if( n.inner < n ) {
       indices <- siteid + (1:n.rep)*B  ## Excludes first set.
       res2 <- spbal::cppBASpts(n = max(indices) - B, seeds = seedshift+B, bases = base::c(2, 3))
-      pts <- rbind(pts, res2$pts[(indices-B),])
+      pts <- rbind(pts, res2$pts[(indices-B),], deparse.level = 0)
       siteid <- c(siteid, indices)
     }
   }
