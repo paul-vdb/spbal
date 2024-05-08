@@ -274,10 +274,10 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     draw <- draw * 2
     # go get sample.
     pts.sample <- getBASSample(shapefile = shapefile, bb = bb , n = draw, seeds = seedshift, J = J)
-    pts.sample$sample$SiteID <- pts.sample$sample$SiteID - (seedshift[1] - seeds[1])
+    pts.sample$sample$SiteID <- pts.sample$sample$SiteID + (seedshift[1] - seeds[1])
     # get sample points.
     
-    if(n_samples == 1) ret_sample <- pts.sample$sample
+    if(n_samples == 0) ret_sample <- pts.sample$sample
     else ret_sample <- rbind(ret_sample, pts.sample$sample) ## Bind them as you work along the sequence.
     # how many samples do we have?
     n_samples <- base::length(ret_sample$SiteID)
