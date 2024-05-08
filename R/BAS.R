@@ -247,22 +247,42 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     seedshift <- seeds
   } # end is.null(seeds)
 
+  # Check given bounding box vs bounding box of given polygon
+  outer.area <- st_area(bb) ## sf polygon object
+  inner.bounds <- st_bbox(shapefile)
+  inner.area <- diff(inner.bounds[c("ymin","ymax")])*diff(inner.bounds[c("xmin","xmax")])
+  prop.area <- as.numeric(inner.area/outer.area)
+
   # number of samples required.
   draw <- n * 4
+
+  # Some basic rules of thumb for prop area can be changed.
+  if(prop.area > 0.5) J <- c(0,0)
+  if(prop.area <= 0.5 & prop.area > 0.01 ) J < c(2,1)
+  if(prop.area <= 0.01 ) J <- c(4,3)
+  if(prop.area <= 0.001 ) J <- c(6,4) ## Don't go on forever.
+  
   # just the first point so far, need n.
   num_samples <- 1
   # count number of times we call spbal::getBASSample.
   call.getBASSample.cnt <- 0
   # keep generating BAS samples until we find n sample points in the study area.
+  seeds <- seedshift
+  n_samples <- 0
   while(num_samples < n){
     # double the number of points to find to try and reduce number of loops.
     draw <- draw * 2
     # go get sample.
-    pts.sample <- getBASSample(shapefile = shapefile, bb = bb , n = draw, seeds = seedshift)
+    pts.sample <- getBASSample(shapefile = shapefile, bb = bb , n = draw, seeds = seedshift, J = J)
+    pts.sample$sample$SiteID <- pts.sample$sample$SiteID - (seedshift[1] - seeds[1])
     # get sample points.
-    ret_sample <- pts.sample$sample
+    
+    if(n_samples == 1) ret_sample <- pts.sample$sample
+    else ret_sample <- rbind(ret_sample, pts.sample$sample) ## Bind them as you work along the sequence.
     # how many samples do we have?
     n_samples <- base::length(ret_sample$SiteID)
+
+    seedshift <- seedshift + draw
 
     if(verbose){
       msg <- "spbal(getBASSampleDriver) after getBASSample n_samples = %s. num_samples = %s"
@@ -279,7 +299,6 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     base::message(msgs)
   }
 
-  seeds <- seedshift
   # add a sample ID for the user.
   ret_sample$spbalSeqID <- base::seq(1, base::length(ret_sample$SiteID))
   # add the "Count" feature for NZ_DOC (acts as a unique ID for backward compatibility purposes).
@@ -307,12 +326,13 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
 #' @param n Number of sites to select. If using stratification it is a named vector containing
 #' sample sizes of each group.
 #' @param seeds A vector of 2 seeds, u1 and u2. seeds must have a value when this function is called.
+#' @param J A vector of 2 integers for efficient clipping of points in the context of a master sample.
 #'
 #' @return A list containing two variables, \code{$sample} containing locations in the BAS sample,
 #' in BAS order and \code{$seeds}, the u1 and u2 seeds used to generate the sample.
 #'
 #' @keywords internal
-getBASSample <- function(shapefile, bb, n, seeds){
+getBASSample <- function(shapefile, bb, n, seeds, J = c(0,0)){
 
   if(base::is.null(seeds)){
     msg <- "spbal(getBASSample) The seeds parameter must not be NULL."
@@ -326,11 +346,36 @@ getBASSample <- function(shapefile, bb, n, seeds){
   scale.bas <- bb.bounds[3:4] - bb.bounds[1:2]
   shift.bas <- bb.bounds[1:2]
 
-  # go generate n Halton points.
-  #res <- cppRSHalton_br(n = n, seeds = seedshift, bases = base::c(2, 3))
-  res <- cppBASpts(n = n, seeds = seedshift, bases = base::c(2, 3))
-  pts <- res$pts
-  siteid <- base::seq(from = 1, to = n, by = 1)
+  if( !any(J != 0) ){
+    res <- cppBASpts(n = n, seeds = seedshift, bases = base::c(2, 3))  
+    siteid <- 1:n
+    pts <- res$pts
+
+  # For a larger outer bounding box in a Master Sample context.
+  }else{
+    inner.bb <- st_bbox(shapefile)
+    inner.pts.scaled <- base::cbind((inner.bb[c('xmin',  'xmax')] - shift.bas[1])/scale.bas[1], 
+      (inner.bb[c('ymin',  'ymax')] - shift.bas[2])/scale.bas[2])
+    # Find box on [0,1) that contains the shape.
+    xlim <- c(floor(inner.pts.scaled[1,1] / (1/2^J[1]))/(2^J[1]), ceiling(inner.pts.scaled[2,1] / (1/2^J[1]))/(2^J[1]))
+    ylim <- c( floor(inner.pts.scaled[1,2] / (1/3^J[2]))/(3^J[2]), ceiling(inner.pts.scaled[2,2] / (1/3^J[2]))/(3^J[2]))
+
+    # Relate BAS points to Halton Frame
+    B <- 2^J[1]*3^J[2]
+    res <- cppBASpts(n = B, seeds = seedshift, bases = base::c(2, 3))
+    
+    ## Keep every Bth siteid point in the Halton Sequence for increased simplicity.
+    siteid <- which(res$pts[,1] > xlim[1] & res$pts[,1] < xlim[2] & res$pts[,2] > ylim[1] & res$pts[,2] < ylim[2])
+    n.inner <- length(siteid )
+    n.rep <- n %/% n.inner
+    pts <- res$pts[siteid,]
+    if( n.inner < n ) {
+      indices <- siteid + (1:n.rep)*B  ## Excludes first set.
+      res2 <- cppBASpts(n = max(indices) - B, seeds = seedshift+B, bases = base::c(2, 3))
+      pts <- rbind(pts, res2$pts[(indices-B),])
+      siteid <- c(siteid, indices)
+    }
+  }
   pts <- base::cbind(siteid, pts)
 
   xy <- base::cbind(pts[,2]*scale.bas[1] + shift.bas[1], pts[,3]*scale.bas[2] + shift.bas[2])
