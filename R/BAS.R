@@ -462,6 +462,6 @@ IndexedBASPts <- function(n = 10, seeds = c(0,0), bases = c(2,3), boxes = NULL) 
     }
     pts[,i+1] <- xk
   }
-  pts[,1] <- k+1-u
+  pts[,1] <- boxes
   return(pts)
 }
