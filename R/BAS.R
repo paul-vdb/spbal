@@ -329,7 +329,8 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
 #' @param n Number of sites to select. If using stratification it is a named vector containing
 #' sample sizes of each group.
 #' @param seeds A vector of 2 seeds, u1 and u2. seeds must have a value when this function is called.
-#' @param J A vector of 2 integers for efficient clipping of points in the context of a master sample.
+#' @param boxes A vector of the ordered points along the Halton sequence from the random seed to be generated.
+#' Default is NULL and n points are generated. If used, then n is ignored.
 #'
 #' @return A list containing two variables, \code{$sample} containing locations in the BAS sample,
 #' in BAS order and \code{$seeds}, the u1 and u2 seeds used to generate the sample.
@@ -350,7 +351,7 @@ getBASSample <- function(shapefile, bb, n, seeds, boxes = NULL){
   shift.bas <- bb.bounds[1:2]
 
   ## Note R numerical accuracy is higher for the Halton Seq than C++. Some differences e-7
-  pts <- IndexedBASPts(n = n, seeds = seeds, bases = bases, boxes = boxes)
+  pts <- BASPtsIndexed(n = n, seeds = seeds, bases = bases, boxes = boxes)
   xy <- base::cbind(pts[,2]*scale.bas[1] + shift.bas[1], pts[,3]*scale.bas[2] + shift.bas[2])
 
   pts.coord <- sf::st_as_sf(base::data.frame(SiteID = pts[,1], xy), coords = c(2, 3))
@@ -366,22 +367,21 @@ getBASSample <- function(shapefile, bb, n, seeds, boxes = NULL){
 }
 
 
-#' @name getBASSample
+#' @name setBASIndex
 #'
-#' @title Generate the BAS sample.
+#' @title Finds a set of Halton indices that will create BAS points near the shapefile.
 #'
-#' @description This function is repeatedly called from function spbal::getBASSampleDriver
-#' to generate a BAS sample.
+#' @description This function is designed to be called internally for efficiency in site selection.
 #'
-#' @details This function was written by Phil Davies.
+#' @details When doing a Master Sample and the bounding box of the greater frame is potentially much
+#' larger than the the polygon being sampled. In this case, we don't want to generate points across the
+#' entire larger bounding box region and then clip them. Instead, we can make use of the Halton sequence
+#' and only generate BAS points near to the shape being sampled. This function finds those indices.
 #'
 #' @param shapefile Shape file as a polygon (sp or sf) to select sites for.
 #' @param bb Bounding box which defines the area around the study area. A bounding box must be
 #' supplied.
-#' @param n Number of sites to select. If using stratification it is a named vector containing
-#' sample sizes of each group.
 #' @param seeds A vector of 2 seeds, u1 and u2. seeds must have a value when this function is called.
-#' @param J A vector of 2 integers for efficient clipping of points in the context of a master sample.
 #'
 #' @return A list containing two variables, \code{$sample} containing locations in the BAS sample,
 #' in BAS order and \code{$seeds}, the u1 and u2 seeds used to generate the sample.
@@ -418,9 +418,9 @@ setBASIndex <- function(shapefile, bb, seeds = c(0,0)){
 
   if( all(J == 0) ) return(list(boxes = 1, B = 1, J = c(0,0), xlim = c(0,1), ylim = c(0,1)))
   ## Intersect first B BAS points in the boxes
-  ptsx <- IndexedBASPts(n = B, seeds = seeds[1], bases = bases[1])
+  ptsx <- BASPtsIndexed(n = B, seeds = seeds[1], bases = bases[1])
   indx <- which(ptsx[,2] >= xlim[1] & ptsx[,2] < xlim[2])
-  ptsy <- IndexedBASPts(n = 1, seeds = seeds[2], bases = bases[2], boxes = indx)
+  ptsy <- BASPtsIndexed(n = 1, seeds = seeds[2], bases = bases[2], boxes = indx)
   pts <- cbind(ptsx[indx,], ptsy[,2])
   indx <- pts[,3] >= ylim[1] & pts[,3] < ylim[2]
   boxes <- pts[indx,1]
@@ -431,7 +431,7 @@ setBASIndex <- function(shapefile, bb, seeds = c(0,0)){
 
 ## Note to self. Boxes starts at 1.
 #' @export
-IndexedBASPts <- function(n = 10, seeds = c(0,0), bases = c(2,3), boxes = NULL) {
+BASPtsIndexed <- function(n = 10, seeds = c(0,0), bases = c(2,3), boxes = NULL) {
   ##
   ## Generate n points from a random start d dimensional Halton sequence.
   ##
