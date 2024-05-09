@@ -232,7 +232,7 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     }
     # find the first point in the study region (picked at random), specifically we want to
     # find the seeds that give us the first point in the study region.
-    first.pt <- findFirstStudyRegionPoint(shapefile = shapefile, bb = bb, seeds = seeds, verbose = verbose)
+    first.pt <- spbal::findFirstStudyRegionPoint(shapefile = shapefile, bb = bb, seeds = seeds, verbose = verbose)
 
     # get the index of the first point (actually the SiteID).
     k <- first.pt$k
@@ -349,6 +349,7 @@ getBASSample <- function(shapefile, bb, n, seeds, boxes = NULL){
   scale.bas <- bb.bounds[3:4] - bb.bounds[1:2]
   shift.bas <- bb.bounds[1:2]
 
+  ## Note R numerical accuracy is higher for the Halton Seq than C++. Some differences e-7
   pts <- IndexedBASPts(n = n, seeds = seeds, bases = bases, boxes = boxes)
   xy <- base::cbind(pts[,2]*scale.bas[1] + shift.bas[1], pts[,3]*scale.bas[2] + shift.bas[2])
 
