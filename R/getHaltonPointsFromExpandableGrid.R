@@ -55,7 +55,7 @@ getHaltonPointsFromExpandableGrid <- function(shapefile,
       # get the frame.
       #message("pt. 1")
       #message(as.numeric(Sys.time())*1000, digits=15)
-      result <- getHaltonFrame(shapefile = shapefile,
+      result <- spbal:::getHaltonFrame(shapefile = shapefile,
                                J = J,
                                i = i,
                                bases = bases,

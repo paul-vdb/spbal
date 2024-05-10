@@ -396,29 +396,30 @@ HaltonFrameBase <- function(n = (bases[1]^J[1]) * (bases[2]^J[2]),
   B <- (bases[1]^j1) * (bases[2]^j2)
   # check how many points the caller wants.
   if(n > B) {
-    B <- (base::floor(n / B) + 1) * B
+    B <- (base::floor(n / B) + 1) * B ## PVDB: I don't understand why we are going to repeat extra points of the same locations.
   }
-  # double the number of points
-  B2 <- 2 * B
-  # compute B2 halton points
+  Bxy <- bases^J
+  # compute B halton points
   #cpprshs <- spbal::cppRSHalton_br(n = B2, bases = bases)
   if(base::is.null(seeds)){
     #cpprshs <- cppBASpts(n = B2, bases = bases)
-    cpprshs <- cppRSHalton_br(n = B2, bases = bases)
+    cpprshs <- cppRSHalton_br(n = B, bases = bases)
   } else {
-    #cpprshs <- cppBASpts(n = B2, bases = bases, seeds = seeds)
-    cpprshs <- cppRSHalton_br(n = B2, bases = bases, seeds = seeds)
+    #cpprshs <- cppBASpts(n = B2, bases = bases, seeds = seeds) ## PVDB: Doesn't make sense to do double the boxes.
+    cpprshs <- cppRSHalton_br(n = B, bases = bases, seeds = seeds)
   }
   # pull points closer to center.
-  z <- ((cpprshs$pts[1:B,] + cpprshs$pts[(B+1):B2,])/2)
+  # z <- ((cpprshs$pts[1:B,] + cpprshs$pts[(B+1):B2,])/2)
+  z <- cpprshs$pts + 2*.Machine$double.eps  ## PVDB: Just adjust with a little bit more than machine precision instead of B2 points.
+  
   # x-dimension
-  x_dim <- (base::floor(bases[1]^j1 * z[,1])/bases[1]^j1) + 0.5*(1/(bases[1]^j1))
+  x_dim <- (base::floor(Bxy[1] * z[,1])/Bxy[1]) + 0.5*(1/Bxy[1])
   # y-dimension
-  y_dim <- (base::floor(bases[2]^j2 * z[,2])/bases[2]^j2) + 0.5*(1/bases[2]^j2)
+  y_dim <- (base::floor(Bxy[2] * z[,2])/Bxy[2]) + 0.5*(1/Bxy[2])
   # Halton Frame
   hf <- base::cbind(x_dim, y_dim)
   # Create an index number for each data point.
-  halton_indx <- base::seq(1, B2/2)
+  halton_indx <- base::seq(1, B)
 
   # Need to return cpprshs$pts, cpprshs$xklist, z, hf and seeds.
   result <- base::list(halton_seq     = cpprshs$pts,
@@ -454,7 +455,7 @@ HaltonFrameBase <- function(n = (bases[1]^J[1]) * (bases[2]^J[2]),
 getHaltonFrame <- function(shapefile, J, i, bases, seeds, crs){
   #
   #seeds <- c(seeds[1]+i, seeds[2]+i)
-  hf_ <- HaltonFrameBase(J = base::c(J[1]+i, J[2]+i), bases = bases, seeds = seeds)
+  hf_ <- spbal:::HaltonFrameBase(J = base::c(J[1]+i, J[2]+i), bases = bases, seeds = seeds)
 
   # process points returned.
   pts <- hf_$halton_frame

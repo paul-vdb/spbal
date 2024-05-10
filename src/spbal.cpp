@@ -163,6 +163,101 @@ Rcpp::List cppBASpts(int n = 10,
                             _["seeds"]  = seeds);
 }
 
+//' @name cppBASptsIndexed
+//'
+//' @title Generate numbers from a Halton Sequence along a specified set of indices.
+//'
+//' @description For efficiency, this function can generate points along a random start
+//' Halton Sequence for a predefined Halton. When boxes are provided it will calculate the Halton Sequence only 
+//' at those boxes and not along the entire sequence.
+//'
+//' @details When not all points along the Halton sequence are required, this function efficiently generates the points
+//' that are needed along a sequence. Taking all points from the random seed equates to boxes = 1:n. However, taking
+//' advantage of how the Halton Sequence repeats itself, we can also select every Bth box to efficiently generate values
+//' at specific locations along the sequence.
+//'
+//' @author Phil Davies, Paul van Dam-Bates, Blair Robertson.
+//'
+//' @param n Number of points required.
+//' @param seeds Random starting point in each dimension.
+//' @param bases Co-prime base for the Halton Sequence.
+//' @param boxes Integer vector of indices to sample along the Halton sequence (default 1:n).
+//' @param verbose A boolean indicating whether informational messages are to be issued.
+//'
+//' @return Matrix with the columns, order of points, x in [0,1) and y in [0,1)
+//'
+//' @examples
+//' # First 10 points in the Halton Sequence for base 2,3
+//' spbal::cppBASpts(n = 10)
+//' # First 10 points in the Halton Sequence for base 2,3 with
+//' # starting point at the 15th and 22nd index.
+//' spbal::cppBASpts(n = 10, seeds = c(14, 21))
+//'
+//' @export
+// [[Rcpp::export(rng = false)]]
+Rcpp::List cppBASptsIndexed(int n = 10,
+                     Rcpp::IntegerVector seeds = Rcpp::IntegerVector::create(),
+                     Rcpp::NumericVector bases = Rcpp::NumericVector::create(),
+                     Rcpp::IntegerVector boxes = Rcpp::IntegerVector::create(),
+                     bool verbose = false)
+{
+  // set default seeds values
+  if (seeds.size() == 0){
+    seeds = {0, 0};
+  }
+  // set default bases values
+  if (bases.size() == 0){
+    bases = {2, 3};
+  }
+  // check boxes vs n:
+  if(boxes.size() == 0){
+    boxes = Rcpp::seq(1, n);
+  }else{
+    n = boxes.size();
+  }
+
+  // initialise variables
+  int d = bases.length();
+  int u, b;
+
+  Rcpp::NumericVector xk;
+  Rcpp::List          xklist;
+  Rcpp::NumericMatrix pts(n, d);
+
+  if (seeds.length() != d){
+    seeds = Rcpp::rep(seeds[1], d);
+  }
+
+  //########### Main Loop #########################################
+  for (int i = 0; i < d; i++){
+    b = bases[i];
+    u = seeds[i];
+    // k <- u:(u+n-1), or defined by user selected boxes;
+    Rcpp::IntegerVector ik = u + boxes - 1;
+    Rcpp::NumericVector k = as<Rcpp::NumericVector>(ik);
+    xk = mod(k, b) / b;
+    xklist.push_back(removeDuplicates(clone(xk)));
+
+    for (int j = 0; j < (std::ceil(log_a_to_base_b(u + n, b)) + 2); j++){
+      Rcpp::NumericVector tmp1 = Rcpp::floor(k / std::pow(b, j + 1));
+      //int tmp000 = std::pow(b, (j + 2));
+      Rcpp::NumericVector tmp2 = mod(tmp1, b) / std::pow(b, (j + 2));
+      xk = xk + tmp2;
+    } // end for j
+
+    // point to column i
+    NumericMatrix::Column thisCol = pts(_, i);
+    // propagate changes to pts.
+    thisCol = thisCol + xk;
+
+  } // end for i
+
+  //return pts;
+  return Rcpp::List::create(_["pts"]    = pts,
+                            _["xklist"] = xklist,
+                            _["seeds"]  = seeds);
+}
+
 
 //' @name cppRSHalton_br
 //'
@@ -186,7 +281,7 @@ Rcpp::List cppBASpts(int n = 10,
 //'  spbal::cppRSHalton_br(n = 10)
 //' # First 10 points in the Halton Sequence for base 2,3 with
 //' # starting point at the 15th and 22nd index.
-//'  spbal::cppRSHalton_br(n = 10, seeds = c(14, 21))
+//'  spbal::cppRSHalton_br(n = 1, seeds = c(14, 21), boxes = 1:10)
 //'
 //' @export
 // [[Rcpp::export(rng = false)]]
