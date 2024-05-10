@@ -351,10 +351,10 @@ getBASSample <- function(shapefile, bb, n, seeds, boxes = NULL){
   shift.bas <- bb.bounds[1:2]
 
   ## Note R numerical accuracy is higher for the Halton Seq than C++. Some differences e-7
-  pts <- cppBASptsIndexed(n = n, seeds = seeds, bases = bases, boxes = boxes)
-  xy <- base::cbind(pts[,2]*scale.bas[1] + shift.bas[1], pts[,3]*scale.bas[2] + shift.bas[2])
+  pts <- cppBASptsIndexed(n = n, seeds = seeds, bases = bases, boxes = boxes)$pts
+  xy <- base::cbind(pts[,1]*scale.bas[1] + shift.bas[1], pts[,2]*scale.bas[2] + shift.bas[2])
 
-  pts.coord <- sf::st_as_sf(base::data.frame(SiteID = pts[,1], xy), coords = c(2, 3))
+  pts.coord <- sf::st_as_sf(base::data.frame(SiteID = boxes, xy), coords = c(2, 3))
 
   sf::st_crs(pts.coord) <- sf::st_crs(bb)
   # find the intersection. Generates the same as sf::st_intersection(pts.coord, shapefile)
@@ -418,17 +418,17 @@ setBASIndex <- function(shapefile, bb, seeds = c(0,0)){
 
   if( all(J == 0) ) return(list(boxes = 1, B = 1, J = c(0,0), xlim = c(0,1), ylim = c(0,1)))
   ## Intersect first B BAS points in the boxes
-  ptsx <- cppBASptsIndexed(n = B, seeds = seeds[1], bases = bases[1])
-  indx <- which(ptsx[,2] >= xlim[1] & ptsx[,2] < xlim[2])
-  ptsy <- cppBASptsIndexed(n = 1, seeds = seeds[2], bases = bases[2], boxes = indx)
-  pts <- cbind(ptsx[indx,], ptsy[,2])
-  indx <- pts[,3] >= ylim[1] & pts[,3] < ylim[2]
-  boxes <- pts[indx,1]
+  ptsx <- cppBASptsIndexed(n = B, seeds = seeds[1], bases = bases[1])$pts
+  indx <- which(ptsx[,1] >= xlim[1] & ptsx[,1] < xlim[2])
+  ptsy <- cppBASptsIndexed(n = 1, seeds = seeds[2], bases = bases[2], boxes = indx)$pts
+  boxes <- indx[ptsy[,1] >= ylim[1] & ptsy[,1] < ylim[2]]
 
   return(list(boxes = boxes, J = J, B = B, xlim = xlim, ylim = ylim))
 }
 
-## Replaced this with C++ function: cppBASptsIndexed
+
+
+## Replaced this with C++ function: cppBASptsIndexed. To be deleted after testing. PVDB
 ## Note to self. Boxes starts at 1.
 #' @export
 BASPtsIndexed <- function(n = 10, seeds = c(0,0), bases = c(2,3), boxes = NULL) {
