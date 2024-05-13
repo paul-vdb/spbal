@@ -282,7 +282,7 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     n_samples <- base::length(pts.sample$sample$SiteID)
 
     ## First time create ret_sample
-    if(n_samples == 0) ret_sample <- pts.sample$sample
+    if(n_samples > 0 & num_samples == 0) ret_sample <- pts.sample$sample
     
     # If some samples are found, and samples were previously found, bind them.
     if(n_samples > 0 & num_samples > 0) ret_sample <- rbind(ret_sample, pts.sample$sample)
