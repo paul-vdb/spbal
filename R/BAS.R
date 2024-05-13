@@ -269,7 +269,7 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     # double the number of points to find to try and reduce number of loops.
     draw <- draw * 2
     
-    boxes <- boxes + B*call.getBASSample.cnt  ## Go to next set of boxes if repeating loop.
+    boxes <- boxes + BASInfo$B*call.getBASSample.cnt  ## Go to next set of boxes if repeating loop.
     ## Create indices repeating every Bth for each box until a full draw is taken.
     ii <- 1
     while( length(boxes) < draw ){
