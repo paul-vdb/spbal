@@ -253,7 +253,7 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
   } # end is.null(seeds)
 
   ## Check bounding box and find efficient Halton indices (boxes)
-  BASInfo <- setBASIndex(shapefile, bb, seedshift)
+  BASInfo <- spbal:::setBASIndex(shapefile, bb, seedshift)
   boxes <- BASInfo$boxes
 
   # number of samples required.
@@ -279,7 +279,7 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     
     # go get sample.
     pts.sample <- getBASSample(shapefile = shapefile, bb = bb , n = draw, seeds = seedshift, boxes = boxes)
-    n_samples <- base::length(pts.sample$SiteID)
+    n_samples <- base::length(pts.sample$sample$SiteID)
 
     ## First time create ret_sample
     if(n_samples == 0) ret_sample <- pts.sample$sample
