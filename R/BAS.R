@@ -347,6 +347,7 @@ getBASSample <- function(shapefile, bb, n, seeds, boxes = NULL){
 
   if(is.null(boxes)) {
     siteid <- base::seq(from = 1, to = n, by = 1)
+    boxes <- siteid
   }else{
     siteid <- boxes
   }
