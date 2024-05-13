@@ -252,30 +252,48 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     seedshift <- seeds
   } # end is.null(seeds)
 
+  ## Check bounding box and find efficient Halton indices (boxes)
+  BASInfo <- setBASIndex(shapefile, bb, seedshift)
+  boxes <- BASInfo$boxes
+
   # number of samples required.
   draw <- n * 4
   # just the first point so far, need n.
-  num_samples <- 1
+  num_samples <- 0
+  n_samples <- 0
+  
   # count number of times we call spbal::getBASSample.
   call.getBASSample.cnt <- 0
   # keep generating BAS samples until we find n sample points in the study area.
   while(num_samples < n){
     # double the number of points to find to try and reduce number of loops.
     draw <- draw * 2
+    
+    boxes <- boxes + B*call.getBASSample.cnt  ## Go to next set of boxes if repeating loop.
+    ## Create indices repeating every Bth for each box until a full draw is taken.
+    ii <- 1
+    while( length(boxes) < draw ){
+      boxes <- c(boxes, BASInfo$boxes + ii*BASInfo$B)
+      ii <- ii+1
+    }
+    
     # go get sample.
-    pts.sample <- getBASSample(shapefile = shapefile, bb = bb , n = draw, seeds = seedshift)
-    # get sample points.
-    ret_sample <- pts.sample$sample
-    # how many samples do we have?
-    n_samples <- base::length(ret_sample$SiteID)
+    pts.sample <- getBASSample(shapefile = shapefile, bb = bb , n = draw, seeds = seedshift, boxes = boxes)
+    n_samples <- base::length(pts.sample$SiteID)
 
+    ## First time create ret_sample
+    if(n_samples == 0) ret_sample <- pts.sample$sample
+    
+    # If some samples are found, and samples were previously found, bind them.
+    if(n_samples > 0 & n_found > 0) ret_sample <- rbind(ret_sample, pts.sample$sample)
+    
     if(verbose){
       msg <- "spbal(getBASSampleDriver) after getBASSample n_samples = %s. num_samples = %s"
       msgs <- base::sprintf(msg, n_samples, num_samples)
       base::message(msgs)
     }
     call.getBASSample.cnt <- call.getBASSample.cnt + 1
-    num_samples <- n_samples
+    num_samples <- num_samples + n_samples  ## New sampled added.
   } # end while num_samples < n
 
   if(verbose){
@@ -375,7 +393,7 @@ getBASSample <- function(shapefile, bb, n, seeds, boxes = NULL){
 #'
 #' @return A list containing two variables, \code{$boxes} containing indices of the BAS sample that fall 
 #' into the bounding box, \code{$J}, the number of subdivision powers taken to find those boxes, \code{$B},
-#' the number of boxes that the indices relate to, \code{$xlim}, the ylimit of the bounding box of the shapefile,
+#' the number of boxes that the indices relate to (1-B), \code{$xlim}, the ylimit of the bounding box of the shapefile,
 #' shifted to the base[1]^J[1] coordinates on the unit box [0,1), \code{$ylim}, the ylimit of the bounding box of 
 #' the shapefile, shifted to the base[2]^J[2] coordinates on the unit box [0,1).
 #'
@@ -384,10 +402,14 @@ setBASIndex <- function(shapefile, bb, seeds = c(0,0)){
 
   # Scale and shift Halton to fit into bounding box
   bb.bounds <- sf::st_bbox(bb)
+  inner.bb <- sf::st_bbox(shapefile)
+
+  ## Check if bb and st_bbox are equivalent, return if they are for efficiency.
+  if( all(inner.bb == bb.bounds) ) return(list(boxes = 1, B = 1, J = c(0,0), xlim = c(0,1), ylim = c(0,1)))
+
   scale.bas <- bb.bounds[3:4] - bb.bounds[1:2]
   shift.bas <- bb.bounds[1:2]
   bases <- c(2,3)
-  inner.bb <- st_bbox(shapefile)
   inner.pts.scaled <- base::cbind((inner.bb[c('xmin',  'xmax')] - shift.bas[1])/scale.bas[1], 
       (inner.bb[c('ymin',  'ymax')] - shift.bas[2])/scale.bas[2])
   inner.area <- diff(inner.pts.scaled[,1])*diff(inner.pts.scaled[,2])
