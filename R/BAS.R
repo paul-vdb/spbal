@@ -285,7 +285,7 @@ getBASSampleDriver <- function(shapefile, bb, n, seeds, verbose = FALSE){
     if(n_samples == 0) ret_sample <- pts.sample$sample
     
     # If some samples are found, and samples were previously found, bind them.
-    if(n_samples > 0 & n_found > 0) ret_sample <- rbind(ret_sample, pts.sample$sample)
+    if(n_samples > 0 & num_samples > 0) ret_sample <- rbind(ret_sample, pts.sample$sample)
     
     if(verbose){
       msg <- "spbal(getBASSampleDriver) after getBASSample n_samples = %s. num_samples = %s"
